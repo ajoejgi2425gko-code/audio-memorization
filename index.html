@@ -505,13 +505,28 @@
         window.addEventListener('load', () => {
             initNativeVoices();
             const params = new URLSearchParams(window.location.search);
-            const shared = [params.get('title'), params.get('text'), params.get('url')].filter(Boolean).join('\n');
-            if (shared) {
+            const sharedFromUrl = [params.get('title'), params.get('text'), params.get('url')].filter(Boolean).join('\n');
+            const importSharedText = shared => {
+                if (!shared) return false;
                 document.getElementById('input-text').value = shared;
                 updateEditorStats();
                 showTab('editor');
+                return true;
+            };
+            if (sharedFromUrl) {
+                importSharedText(sharedFromUrl);
                 history.replaceState({}, '', window.location.pathname);
             } else {
+                // Long shares arrive via POST; the service worker stores them outside the URL.
+                fetch(new URL('./__shared_data__', document.baseURI).href, { cache: 'no-store' })
+                    .then(response => response.ok ? response.json() : null)
+                    .then(data => {
+                        if (!data) return;
+                        const cacheKey = new URL('./__shared_data__', document.baseURI).href;
+                        if ('caches' in window) caches.open('audio-memorization-share-v1').then(cache => cache.delete(cacheKey));
+                        importSharedText([data.title, data.text, data.url].filter(Boolean).join('\n'));
+                    })
+                    .catch(() => {});
                 restorePlaybackState();
                 if (!document.getElementById('input-text').value) loadPreset(0);
             }

@@ -1,4 +1,6 @@
-const CACHE_NAME = 'audio-memorization-pwa-v5';
+const CACHE_NAME = 'audio-memorization-pwa-v6';
+const SHARE_CACHE = 'audio-memorization-share-v1';
+const SHARE_DATA_URL = new URL('./__shared_data__', self.location.href).href;
 const BASE_URL = new URL('./', self.location.href);
 const APP_SHELL = [
   './',
@@ -27,6 +29,21 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  const requestUrl = new URL(event.request.url);
+  if (event.request.method === 'POST' && requestUrl.origin === self.location.origin && requestUrl.pathname.endsWith('/share/')) {
+    event.respondWith((async () => {
+      const form = await event.request.formData();
+      const value = {
+        title: String(form.get('title') || ''),
+        text: String(form.get('text') || ''),
+        url: String(form.get('url') || '')
+      };
+      const cache = await caches.open(SHARE_CACHE);
+      await cache.put(SHARE_DATA_URL, new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json; charset=utf-8' } }));
+      return Response.redirect(BASE_URL.href, 303);
+    })());
+    return;
+  }
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
