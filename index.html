@@ -1,0 +1,539 @@
+<!DOCTYPE html><html lang="ja" class="dark"><head>    <meta charset="UTF-8">    <meta name="viewport" content="width=device-width, initial-scale=1.0">    <title>隙間時間テキスト読み上げ・音声暗記プレイヤー</title>
+    
+    <!-- PWA & スマホ用設定 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#4285f4">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Tailwind CSS -->    <script src="https://cdn.tailwindcss.com"></script>    <script>        tailwind.config = {            darkMode: 'class',            theme: {                extend: {                    colors: {                        brand: {                            50: '#f0fdf4',                            500: '#22c55e',                            600: '#16a34a',                            700: '#15803d',                        }                    }                }            }        }    </script>    <!-- FontAwesome Icons -->    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">    <style>        body {            background-color: #0f172a;            color: #f8fafc;            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;        }        .custom-scrollbar::-webkit-scrollbar {            width: 6px;        }        .custom-scrollbar::-webkit-scrollbar-track {            background: #1e293b;        }        .custom-scrollbar::-webkit-scrollbar-thumb {            background: #475569;            border-radius: 4px;        }        .sentence-active {            background-color: rgba(34, 197, 94, 0.18);            border-left: 4px solid #22c55e;            color: #ffffff;            font-weight: 600;        }        .sentence-item {            transition: all 0.2s ease;        }        .sentence-item:hover {            background-color: rgba(255, 255, 255, 0.05);        }    </style><link rel="icon" type="image/png" sizes="48x48" href="/favicon.png">
+<link rel="shortcut icon" href="/favicon.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+</head><body class="min-h-screen flex flex-col justify-between bg-slate-900 text-slate-100 selection:bg-emerald-500 selection:text-white">
+    <!-- App Header -->    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50 px-4 py-3">        <div class="max-w-4xl mx-auto flex items-center justify-between">            <div class="flex items-center gap-3 cursor-pointer" onclick="showTab('editor')">                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-black">                    <i class="fa-solid fa-headphones text-lg"></i>                </div>                <div>                    <h1 class="font-black text-base sm:text-lg leading-tight tracking-tight text-white flex items-center gap-2">                        音声暗記プレイヤー <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">Audio Reader</span>                    </h1>                </div>            </div>            <div class="flex items-center gap-2">                <button id="btn-tab-editor" onclick="showTab('editor')" class="text-xs px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold transition border border-slate-700">                    <i class="fa-solid fa-pen-to-square me-1"></i> テキスト編集                </button>                <button id="btn-tab-player" onclick="showTab('player')" class="text-xs px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition border border-slate-700">                    <i class="fa-solid fa-circle-play me-1"></i> プレイヤー                </button>            </div>        </div>    </header>
+    <!-- Main Content -->    <main class="max-w-4xl w-full mx-auto px-4 py-6 flex-grow flex flex-col justify-center">
+        <!-- TAB 1: TEXT EDITOR & SETTINGS -->        <section id="sec-editor" class="space-y-6">            <div class="text-center space-y-2">                <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">                    隙間時間の耳学・聞き流し暗記                </span>                <h2 class="text-2xl sm:text-3xl font-black text-white">暗記テキストの読み上げ設定</h2>                <p class="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">                    文章を入力またはペーストしてください。句読点や改行で自動分解され、手ぶらで1文ずつ聞き流し再生できます。                </p>            </div>
+            <!-- Sample Presets -->            <div class="bg-slate-800/60 p-4 rounded-2xl border border-slate-700/60 space-y-2">                <div class="flex justify-between items-center">                    <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">                        <i class="fa-solid fa-book-open text-emerald-400 me-1"></i> サンプルテキストの読み込み                    </label>
+                    <button onclick="clearText()" class="text-xs text-rose-400 hover:text-rose-300 transition">                        <i class="fa-solid fa-trash-can me-1"></i> クリア                    </button>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button onclick="loadPreset(0)" class="p-2.5 rounded-xl bg-slate-700/50 hover:bg-slate-700 text-left text-xs font-medium border border-slate-600/40 transition">
+                        <div class="text-[10px] text-emerald-400 font-bold">歴史</div>
+                        <div class="truncate text-slate-200">明治維新の流れ</div>
+                    </button>
+                    <button onclick="loadPreset(1)" class="p-2.5 rounded-xl bg-slate-700/50 hover:bg-slate-700 text-left text-xs font-medium border border-slate-600/40 transition">
+                        <div class="text-[10px] text-emerald-400 font-bold">英会話</div>
+                        <div class="truncate text-slate-200">ビジネスリスニング</div>
+                    </button>
+                    <button onclick="loadPreset(2)" class="p-2.5 rounded-xl bg-slate-700/50 hover:bg-slate-700 text-left text-xs font-medium border border-slate-600/40 transition">
+                        <div class="text-[10px] text-emerald-400 font-bold">資格・法律</div>
+                        <div class="truncate text-slate-200">日本国憲法前文</div>
+                    </button>
+                    <button onclick="loadPreset(3)" class="p-2.5 rounded-xl bg-slate-700/50 hover:bg-slate-700 text-left text-xs font-medium border border-slate-600/40 transition">
+                        <div class="text-[10px] text-emerald-400 font-bold">科学</div>
+                        <div class="truncate text-slate-200">宇宙と銀河系</div>
+                    </button>
+                </div>
+            </div>
+            <!-- Text Area -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-center text-xs text-slate-400">
+                    <span class="font-bold text-slate-300">読み上げテキスト</span>
+                    <span id="editor-char-count">0 文字 / 0 文</span>
+                </div>
+                <textarea
+                    id="input-text"
+                    rows="8"
+                    placeholder="ここに読み上げたい文章を入力してください。&#10;句読点（。！？ . ! ?）や改行ごとに1文として分割されます。"
+                    class="w-full p-4 rounded-2xl bg-slate-800/90 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 text-sm sm:text-base leading-relaxed custom-scrollbar transition"
+                    oninput="updateEditorStats()"
+                ></textarea>
+            </div>
+            <!-- Voice Engine & Voice Settings -->
+            <div class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/80 space-y-4">
+                <div class="text-xs font-bold text-slate-300 flex items-center justify-between">
+                    <span><i class="fa-solid fa-sliders text-emerald-400 me-1"></i> 音声・エンジン設定</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Engine Selection -->
+                    <div class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-400">音声エンジン</label>
+                        <select id="select-engine" onchange="toggleEngineUI()" class="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="native" selected>標準ブラウザ音声 (高速・無制限)</option>
+                            <option value="gemini">Gemini AI Voice (高音質AI音声)</option>
+                        </select>
+                    </div>
+                    <!-- Native Voice List -->
+                    <div id="native-voice-box" class="space-y-1">
+                        <label class="text-xs font-semibold text-slate-400">音声の種類 (標準)</label>
+                        <select id="select-native-voice" class="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <!-- Gemini Voice Selection -->
+                    <div id="gemini-voice-box" class="space-y-1 hidden">
+                        <label class="text-xs font-semibold text-slate-400">AIボイス (Gemini)</label>
+                        <select id="select-gemini-voice" class="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="Kore">Kore (落ち着いた声)</option>
+                            <option value="Puck">Puck (明るく爽やか)</option>
+                            <option value="Zephyr">Zephyr (クリアで明瞭)</option>
+                            <option value="Fenrir">Fenrir (低音・力強い)</option>
+                            <option value="Aoede">Aoede (やわらかい声)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <!-- Start Playback Button -->
+            <button
+                onclick="startPlayer()"
+                class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-base sm:text-lg shadow-lg shadow-emerald-950/50 transition active:scale-[0.98] flex items-center justify-center gap-3"
+            >
+                <i class="fa-solid fa-circle-play text-xl"></i> 音声プレイヤーを起動して再生
+            </button>
+        </section>
+        <!-- TAB 2: AUDIO PLAYER UI -->
+        <section id="sec-player" class="hidden space-y-4">
+                        
+            <!-- Player Status Dashboard Card -->
+            <div class="bg-slate-800/90 border border-slate-700 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
+                
+                <!-- Progress Header -->
+                <div class="flex items-center justify-between text-xs font-bold">
+                    <span id="player-status-badge" class="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 準備完了
+                    </span>
+                    <span id="player-sentence-counter" class="text-slate-400 font-mono">
+                        1 / 1 文目
+                    </span>
+                </div>
+                <!-- Progress Bar -->
+                <div class="w-full bg-slate-900 h-3 rounded-full overflow-hidden p-0.5 border border-slate-700/50">
+                    <div id="player-progress-bar" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full w-0 transition-all duration-300 rounded-full"></div>
+                </div>
+                <!-- Current Sentence Display Box -->
+                <div class="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-5 text-center space-y-2 min-h-[110px] flex flex-col justify-center">
+                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">現在再生中の文</div>
+                    <div id="current-sentence-text" class="text-base sm:text-xl font-bold leading-relaxed text-emerald-300 transition-all">
+                        -- 再生ボタンを押すと始まります --
+                    </div>
+                </div>
+                <!-- Main Audio Controls Dashboard -->
+                <div class="space-y-4 pt-2">
+                    
+                    <!-- Transport Buttons Row -->
+                    <div class="flex items-center justify-center gap-3 sm:gap-5">
+                        <button onclick="prevSentence()" title="前の文" class="w-11 h-11 rounded-2xl bg-slate-700/80 hover:bg-slate-700 active:scale-95 text-slate-200 flex items-center justify-center transition border border-slate-600">
+                            <i class="fa-solid fa-backward-step text-base"></i>
+                        </button>
+                        <button id="btn-main-play" onclick="togglePlayPause()" class="w-16 h-16 rounded-3xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 active:scale-95 text-white flex items-center justify-center text-2xl shadow-lg shadow-emerald-950/60 transition">
+                            <i id="icon-main-play" class="fa-solid fa-play ml-1"></i>
+                        </button>
+                        <button onclick="nextSentence()" title="次の文" class="w-11 h-11 rounded-2xl bg-slate-700/80 hover:bg-slate-700 active:scale-95 text-slate-200 flex items-center justify-center transition border border-slate-600">
+                            <i class="fa-solid fa-forward-step text-base"></i>
+                        </button>
+                        <button id="btn-loop-toggle" onclick="toggleSingleLoop()" title="1文リピート再生" class="w-11 h-11 rounded-2xl bg-slate-700/80 hover:bg-slate-700 active:scale-95 text-slate-400 flex items-center justify-center transition border border-slate-600">
+                            <i class="fa-solid fa-repeat text-base"></i>
+                        </button>
+                    </div>
+                    <!-- Speed & Pitch Sliders -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-700/50 text-xs">
+                        <!-- Playback Speed Slider -->
+                        <div class="flex items-center justify-between bg-slate-900/60 px-3 py-2 rounded-xl border border-slate-700/50">
+                            <span class="text-slate-400 font-medium"><i class="fa-solid fa-gauge-high text-emerald-400 me-1"></i> 速度: <span id="val-speed" class="font-bold text-slate-200 font-mono">1.0x</span></span>
+                            <input type="range" id="slider-speed" min="0.5" max="2.0" step="0.1" value="1.0" oninput="onSpeedChange()" class="w-24 accent-emerald-500 bg-slate-700 rounded cursor-pointer">
+                        </div>
+                        <!-- Interval Delay between sentences -->
+                        <div class="flex items-center justify-between bg-slate-900/60 px-3 py-2 rounded-xl border border-slate-700/50">
+                            <span class="text-slate-400 font-medium"><i class="fa-solid fa-pause text-emerald-400 me-1"></i> 文間ポーズ: <span id="val-delay" class="font-bold text-slate-200 font-mono">0.5秒</span></span>
+                            <input type="range" id="slider-delay" min="0" max="3" step="0.5" value="0.5" oninput="onDelayChange()" class="w-24 accent-emerald-500 bg-slate-700 rounded cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Sentence List Display Box -->
+            <div class="bg-slate-800/80 border border-slate-700/80 rounded-3xl p-4 sm:p-6 space-y-3">
+                <div class="flex justify-between items-center text-xs font-bold text-slate-400">
+                    <span><i class="fa-solid fa-list-ol text-emerald-400 me-1"></i> テキスト文章一覧 (タップでその文へジャンプ)</span>
+                    <span class="text-[10px] text-slate-500">クリックして途中再生可能</span>
+                </div>
+                <!-- Dynamically populated sentence cards -->
+                <div id="sentence-list" class="space-y-1.5 custom-scrollbar max-h-[42vh] overflow-y-auto pr-1">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+        </section>
+    </main>
+    <!-- Application Logic -->
+    <script>
+        // Preset sample datasets
+        const PRESETS = [
+            `1867年に大政奉還が行われ、徳川幕府から朝廷へ政権が返還されました。\n翌1868年には明治天皇による「五箇条の御誓文」が発布され、近代国家への歩みが始まりました。\n版籍奉還と廃藩置県により中央集権化が推進され、殖産興業と富国強兵が進められました。`,
+            `Welcome to our global learning program.\nListening to English sentences every day is the most effective way to improve your speaking skills.\nPlease repeat after each sentence to fix the memory in your brain.`,
+            `日本国憲法は、日本国民の恒久の平和を希求し、人間相互の関係を支配する崇高な理想を深く自覚します。\n平和を維持し、専制と隷従、圧迫と偏狭を地上から永遠に除去しようと努めている国際社会において、名誉ある地位を占めたいと思います。`,
+            `私たちの太陽系が属する銀河系は、約1000億個以上の恒星が存在する渦巻銀河です。\n太陽系から最も近い恒星系は、約4.2光年離れたプロキシマ・ケンタウリです。\n宇宙の膨張速度は年々測定されており、暗黒物質の解明が進められています。`
+        ];
+        // Global Application State
+        let state = {
+            rawText: '',
+            sentences: [],
+            currentIndex: 0,
+            isPlaying: false,
+            isSingleLoop: false,
+            playbackSpeed: 1.0,
+            sentenceDelaySec: 0.5,
+            engine: 'native', // 'native' | 'gemini'
+            nativeVoice: null,
+            geminiVoice: 'Kore',
+            timeoutId: null,
+            audioElement: null
+        };
+        // Web Speech API Synthesis reference
+        const synth = window.speechSynthesis;
+        let availableNativeVoices = [];
+        function initNativeVoices() {
+            if (!synth) return;
+            const updateVoices = () => {
+                availableNativeVoices = synth.getVoices().filter(v => v.lang.startsWith('ja') || v.lang.startsWith('en'));
+                if (availableNativeVoices.length === 0) {
+                    availableNativeVoices = synth.getVoices();
+                }
+                
+                const select = document.getElementById('select-native-voice');
+                select.innerHTML = '';
+                availableNativeVoices.forEach((v, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.innerText = `${v.name} (${v.lang})`;
+                    if (v.default) opt.selected = true;
+                    select.appendChild(opt);
+                });
+            };
+            updateVoices();
+            if (synth.onvoiceschanged !== undefined) {
+                synth.onvoiceschanged = updateVoices;
+            }
+        }
+        function toggleEngineUI() {
+            const engine = document.getElementById('select-engine').value;
+            state.engine = engine;
+            if (engine === 'native') {
+                document.getElementById('native-voice-box').classList.remove('hidden');
+                document.getElementById('gemini-voice-box').classList.add('hidden');
+            } else {
+                document.getElementById('native-voice-box').classList.add('hidden');
+                document.getElementById('gemini-voice-box').classList.remove('hidden');
+            }
+        }
+        // Convert PCM Int16 to WAV Blob
+        function pcmToWav(pcm16, sampleRate) {
+            const buffer = new ArrayBuffer(44 + pcm16.length * 2);
+            const view = new DataView(buffer);
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + pcm16.length * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); // PCM format
+            view.setUint16(22, 1, true); // Mono
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, pcm16.length * 2, true);
+            for (let i = 0; i < pcm16.length; i++) {
+                view.setInt16(44 + i * 2, pcm16[i], true);
+            }
+            return new Blob([view], { type: 'audio/wav' });
+        }
+        async function fetchGeminiTTSAudioUrl(text, voiceName) {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{
+                    parts: [{ text: text }]
+                }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: voiceName }
+                        }
+                    }
+                }
+            };
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            const part = result?.candidates?.[0]?.content?.parts?.[0];
+            const audioData = part?.inlineData?.data;
+            const mimeType = part?.inlineData?.mimeType || '';
+            if (audioData) {
+                const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 24000;
+                
+                const binary = atob(audioData);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                const pcm16 = new Int16Array(bytes.buffer);
+                const wavBlob = pcmToWav(pcm16, sampleRate);
+                return URL.createObjectURL(wavBlob);
+            }
+            throw new Error("Failed to generate Gemini audio");
+        }
+        function parseSentences(text) {
+            if (!text) return [];
+            // Split by sentence delimiters or newlines
+            const rawParts = text.split(/(?<=[。！？\n.!?])\s*/);
+            return rawParts
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+        }
+        function showTab(tab) {
+            if (tab === 'editor') {
+                document.getElementById('sec-editor').classList.remove('hidden');
+                document.getElementById('sec-player').classList.add('hidden');
+                document.getElementById('btn-tab-editor').className = 'text-xs px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold transition border border-slate-700';
+                document.getElementById('btn-tab-player').className = 'text-xs px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition border border-slate-700';
+            } else {
+                document.getElementById('sec-editor').classList.add('hidden');
+                document.getElementById('sec-player').classList.remove('hidden');
+                document.getElementById('btn-tab-editor').className = 'text-xs px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition border border-slate-700';
+                document.getElementById('btn-tab-player').className = 'text-xs px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold transition border border-slate-700';
+            }
+        }
+        function updateEditorStats() {
+            const text = document.getElementById('input-text').value;
+            const sentences = parseSentences(text);
+            document.getElementById('editor-char-count').innerText = `${text.length} 文字 / ${sentences.length} 文`;
+        }
+        function loadPreset(idx) {
+            document.getElementById('input-text').value = PRESETS[idx];
+            updateEditorStats();
+        }
+        function clearText() {
+            document.getElementById('input-text').value = '';
+            updateEditorStats();
+        }
+        function startPlayer() {
+            const text = document.getElementById('input-text').value.trim();
+            if (!text) {
+                alert('読み上げたい文章を入力してください。');
+                return;
+            }
+            state.sentences = parseSentences(text);
+            state.currentIndex = 0;
+            renderSentenceList();
+            showTab('player');
+            playCurrentSentence();
+        }
+        function renderSentenceList() {
+            const container = document.getElementById('sentence-list');
+            container.innerHTML = '';
+            state.sentences.forEach((sent, idx) => {
+                const item = document.createElement('div');
+                const isActive = idx === state.currentIndex;
+                item.className = `sentence-item p-3 rounded-xl border border-slate-700/60 cursor-pointer flex items-start gap-3 ${isActive ? 'sentence-active' : 'bg-slate-900/40 text-slate-300'}`;
+                item.onclick = () => jumpToSentence(idx);
+                item.innerHTML = `
+                    <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-emerald-400 border border-slate-700">${idx + 1}</span>
+                    <span class="text-xs sm:text-sm flex-grow leading-relaxed">${sent}</span>
+                `;
+                container.appendChild(item);
+            });
+            updatePlayerUI();
+        }
+        function updatePlayerUI() {
+            const total = state.sentences.length;
+            const current = state.currentIndex;
+            document.getElementById('player-sentence-counter').innerText = `${current + 1} / ${total} 文目`;
+            
+            const pct = total > 0 ? Math.round(((current + 1) / total) * 100) : 0;
+            document.getElementById('player-progress-bar').style.width = `${pct}%`;
+            const currentText = state.sentences[current] || '-- 終了 --';
+            document.getElementById('current-sentence-text').innerText = currentText;
+            // Highlight in list & scroll
+            const container = document.getElementById('sentence-list');
+            const items = container.children;
+            for (let i = 0; i < items.length; i++) {
+                if (i === current) {
+                    items[i].className = 'sentence-item p-3 rounded-xl border border-slate-700/60 cursor-pointer flex items-start gap-3 sentence-active';
+                    items[i].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    items[i].className = 'sentence-item p-3 rounded-xl border border-slate-700/60 cursor-pointer flex items-start gap-3 bg-slate-900/40 text-slate-300';
+                }
+            }
+            // Play/Pause button status
+            const playBtn = document.getElementById('icon-main-play');
+            const statusBadge = document.getElementById('player-status-badge');
+            if (state.isPlaying) {
+                playBtn.className = 'fa-solid fa-pause';
+                statusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 再生中...`;
+            } else {
+                playBtn.className = 'fa-solid fa-play ml-1';
+                statusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400"></span> 一時停止`;
+            }
+            // Loop button icon styling
+            const loopBtn = document.getElementById('btn-loop-toggle');
+            if (state.isSingleLoop) {
+                loopBtn.className = 'w-11 h-11 rounded-2xl bg-emerald-500/20 border border-emerald-500/50 active:scale-95 text-emerald-400 flex items-center justify-center transition';
+            } else {
+                loopBtn.className = 'w-11 h-11 rounded-2xl bg-slate-700/80 hover:bg-slate-700 active:scale-95 text-slate-400 flex items-center justify-center transition border border-slate-600';
+            }
+        }
+        function stopAudio() {
+            if (synth) synth.cancel();
+            if (state.audioElement) {
+                state.audioElement.pause();
+                state.audioElement = null;
+            }
+            if (state.timeoutId) {
+                clearTimeout(state.timeoutId);
+                state.timeoutId = null;
+            }
+        }
+        async function playCurrentSentence() {
+            stopAudio();
+            if (state.currentIndex >= state.sentences.length) {
+                state.isPlaying = false;
+                state.currentIndex = 0;
+                updatePlayerUI();
+                return;
+            }
+            state.isPlaying = true;
+            updatePlayerUI();
+            const textToSpeech = state.sentences[state.currentIndex];
+            if (state.engine === 'native') {
+                playNativeTTS(textToSpeech);
+            } else {
+                try {
+                    await playGeminiTTS(textToSpeech);
+                } catch (e) {
+                    console.warn("Gemini audio error, falling back to Native", e);
+                    playNativeTTS(textToSpeech);
+                }
+            }
+        }
+        function playNativeTTS(text) {
+            if (!synth) return;
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = state.playbackSpeed;
+            const selectedIdx = document.getElementById('select-native-voice').value;
+            if (availableNativeVoices[selectedIdx]) {
+                utterance.voice = availableNativeVoices[selectedIdx];
+            }
+            utterance.onend = () => {
+                onSentenceFinished();
+            };
+            utterance.onerror = () => {
+                onSentenceFinished();
+            };
+            synth.speak(utterance);
+        }
+        async function playGeminiTTS(text) {
+            const voiceName = document.getElementById('select-gemini-voice').value || 'Kore';
+            const audioUrl = await fetchGeminiTTSAudioUrl(text, voiceName);
+            
+            const audio = new Audio(audioUrl);
+            audio.playbackRate = state.playbackSpeed;
+            state.audioElement = audio;
+            audio.onended = () => {
+                onSentenceFinished();
+            };
+            audio.onerror = () => {
+                onSentenceFinished();
+            };
+            audio.play();
+        }
+        function onSentenceFinished() {
+            if (!state.isPlaying) return;
+            const delayMs = state.sentenceDelaySec * 1000;
+            state.timeoutId = setTimeout(() => {
+                if (!state.isPlaying) return;
+                if (state.isSingleLoop) {
+                    playCurrentSentence();
+                } else {
+                    if (state.currentIndex + 1 < state.sentences.length) {
+                        state.currentIndex++;
+                        playCurrentSentence();
+                    } else {
+                        state.isPlaying = false;
+                        updatePlayerUI();
+                    }
+                }
+            }, delayMs);
+        }
+        function togglePlayPause() {
+            if (state.isPlaying) {
+                state.isPlaying = false;
+                stopAudio();
+                updatePlayerUI();
+            } else {
+                if (state.sentences.length === 0) {
+                    startPlayer();
+                } else {
+                    playCurrentSentence();
+                }
+            }
+        }
+        function nextSentence() {
+            if (state.currentIndex + 1 < state.sentences.length) {
+                state.currentIndex++;
+                playCurrentSentence();
+            }
+        }
+        function prevSentence() {
+            if (state.currentIndex > 0) {
+                state.currentIndex--;
+                playCurrentSentence();
+            }
+        }
+        function jumpToSentence(idx) {
+            state.currentIndex = idx;
+            playCurrentSentence();
+        }
+        function toggleSingleLoop() {
+            state.isSingleLoop = !state.isSingleLoop;
+            updatePlayerUI();
+        }
+        function onSpeedChange() {
+            const val = parseFloat(document.getElementById('slider-speed').value);
+            state.playbackSpeed = val;
+            document.getElementById('val-speed').innerText = `${val.toFixed(1)}x`;
+            if (state.audioElement) {
+                state.audioElement.playbackRate = val;
+            }
+        }
+        function onDelayChange() {
+            const val = parseFloat(document.getElementById('slider-delay').value);
+            state.sentenceDelaySec = val;
+            document.getElementById('val-delay').innerText = `${val.toFixed(1)}秒`;
+        }
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            initNativeVoices();
+            loadPreset(0);
+        });
+    </script>
+
+    <!-- PWA Service Worker 登録スクリプト -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker 登録成功:', reg.scope))
+                    .catch(err => console.log('Service Worker 登録失敗:', err));
+            });
+        }
+    </script>
+</body></html>
