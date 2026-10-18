@@ -1,4 +1,4 @@
-const CACHE_NAME = 'audio-memorization-pwa-v4';
+const CACHE_NAME = 'audio-memorization-pwa-v5';
 const BASE_URL = new URL('./', self.location.href);
 const APP_SHELL = [
   './',

@@ -129,6 +129,10 @@
                             <input type="range" id="slider-delay" min="0" max="3" step="0.5" value="0.5" oninput="onDelayChange()" class="w-24 accent-emerald-500 bg-slate-700 rounded cursor-pointer">
                         </div>
                     </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700/50 pt-3 text-xs">
+                        <span class="text-slate-400">画面オフ対策（任意・バッテリー消費に注意）</span>
+                        <button id="btn-wake-lock" onclick="toggleWakeLock()" class="px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200">画面を点灯したままにする：OFF</button>
+                    </div>
                 </div>
             </div>
             <!-- Sentence List Display Box -->
@@ -171,28 +175,33 @@
         // Web Speech API Synthesis reference
         const synth = window.speechSynthesis;
         let availableNativeVoices = [];
+        let wakeLock = null;
+        let wakeLockEnabled = false;
+        let interruptedWhileHidden = false;
         function initNativeVoices() {
             if (!synth) return;
             const updateVoices = () => {
-                availableNativeVoices = synth.getVoices().filter(v => v.lang.startsWith('ja') || v.lang.startsWith('en'));
-                if (availableNativeVoices.length === 0) {
-                    availableNativeVoices = synth.getVoices();
-                }
-                
+                const allVoices = synth.getVoices();
+                availableNativeVoices = allVoices.filter(v => v.lang && (v.lang.toLowerCase().startsWith('ja') || v.lang.toLowerCase().startsWith('en')));
+                if (availableNativeVoices.length === 0) availableNativeVoices = allVoices;
                 const select = document.getElementById('select-native-voice');
+                const previousKey = select.selectedOptions[0]?.dataset.voiceKey || '';
                 select.innerHTML = '';
                 availableNativeVoices.forEach((v, i) => {
                     const opt = document.createElement('option');
                     opt.value = i;
+                    opt.dataset.voiceKey = `${v.name}|${v.lang}`;
                     opt.innerText = `${v.name} (${v.lang})`;
-                    if (v.default) opt.selected = true;
                     select.appendChild(opt);
                 });
+                // Default to Japanese, preferring a Japanese voice marked default; retain a user choice if possible.
+                const preferred = availableNativeVoices.findIndex(v => `${v.name}|${v.lang}` === previousKey);
+                const japaneseDefault = availableNativeVoices.findIndex(v => v.lang && v.lang.toLowerCase().startsWith('ja') && v.default);
+                const japaneseVoice = availableNativeVoices.findIndex(v => v.lang && v.lang.toLowerCase().startsWith('ja'));
+                select.value = String(preferred >= 0 ? preferred : japaneseDefault >= 0 ? japaneseDefault : japaneseVoice >= 0 ? japaneseVoice : 0);
             };
             updateVoices();
-            if (synth.onvoiceschanged !== undefined) {
-                synth.onvoiceschanged = updateVoices;
-            }
+            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = updateVoices;
         }
         function parseSentences(text) {
             if (!text) return [];
@@ -236,6 +245,7 @@
             }
             state.sentences = parseSentences(text);
             state.currentIndex = 0;
+            savePlaybackState();
             renderSentenceList();
             showTab('player');
             playCurrentSentence();
@@ -328,6 +338,9 @@
             const selectedIdx = document.getElementById('select-native-voice').value;
             if (availableNativeVoices[selectedIdx]) {
                 utterance.voice = availableNativeVoices[selectedIdx];
+                utterance.lang = availableNativeVoices[selectedIdx].lang || 'ja-JP';
+            } else {
+                utterance.lang = 'ja-JP';
             }
             utterance.onend = () => {
                 // Ignore callbacks from speech cancelled by a jump, pause, or new playback.
@@ -345,15 +358,18 @@
             if (!state.isPlaying) return;
             const delayMs = state.sentenceDelaySec * 1000;
             state.timeoutId = setTimeout(() => {
+                state.timeoutId = null;
                 if (!state.isPlaying) return;
                 if (state.isSingleLoop) {
                     playCurrentSentence();
                 } else {
                     if (state.currentIndex + 1 < state.sentences.length) {
                         state.currentIndex++;
+                        savePlaybackState();
                         playCurrentSentence();
                     } else {
                         state.isPlaying = false;
+                        savePlaybackState();
                         updatePlayerUI();
                     }
                 }
@@ -363,6 +379,7 @@
             if (state.isPlaying) {
                 state.isPlaying = false;
                 stopAudio();
+                savePlaybackState();
                 updatePlayerUI();
             } else {
                 if (state.sentences.length === 0) {
@@ -375,6 +392,7 @@
         function nextSentence() {
             if (state.currentIndex + 1 < state.sentences.length) {
                 state.currentIndex++;
+                savePlaybackState();
                 playCurrentSentence();
             }
         }
@@ -386,15 +404,92 @@
         }
         function jumpToSentence(idx) {
             state.currentIndex = idx;
+            savePlaybackState();
             playCurrentSentence();
         }
         function toggleSingleLoop() {
             state.isSingleLoop = !state.isSingleLoop;
+            savePlaybackState();
             updatePlayerUI();
+        }
+        function savePlaybackState() {
+            try {
+                sessionStorage.setItem('audioMemorizationPlayback', JSON.stringify({
+                    text: document.getElementById('input-text').value,
+                    currentIndex: state.currentIndex,
+                    isSingleLoop: state.isSingleLoop,
+                    playbackSpeed: state.playbackSpeed,
+                    sentenceDelaySec: state.sentenceDelaySec
+                }));
+            } catch (e) { /* storage can be unavailable in private browsing */ }
+        }
+        function restorePlaybackState() {
+            try {
+                const saved = JSON.parse(sessionStorage.getItem('audioMemorizationPlayback') || 'null');
+                if (!saved || !saved.text) return;
+                document.getElementById('input-text').value = saved.text;
+                state.sentences = parseSentences(saved.text);
+                state.currentIndex = Math.min(Math.max(0, Number(saved.currentIndex) || 0), Math.max(0, state.sentences.length - 1));
+                state.isSingleLoop = !!saved.isSingleLoop;
+                state.playbackSpeed = Number(saved.playbackSpeed) || 1;
+                state.sentenceDelaySec = Number.isFinite(Number(saved.sentenceDelaySec)) ? Number(saved.sentenceDelaySec) : 0.5;
+                document.getElementById('slider-speed').value = state.playbackSpeed;
+                document.getElementById('val-speed').innerText = `${state.playbackSpeed.toFixed(1)}x`;
+                document.getElementById('slider-delay').value = state.sentenceDelaySec;
+                document.getElementById('val-delay').innerText = `${state.sentenceDelaySec.toFixed(1)}秒`;
+                updateEditorStats();
+                renderSentenceList();
+                showTab('player');
+                document.getElementById('player-status-badge').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span> 前回の位置を復元（再生ボタンで再開）';
+            } catch (e) { /* ignore invalid saved state */ }
+        }
+        async function toggleWakeLock() {
+            if (!('wakeLock' in navigator)) {
+                alert('このブラウザは画面点灯維持に対応していません。画面オフ後の読み上げ継続は端末・ブラウザに依存します。');
+                return;
+            }
+            wakeLockEnabled = !wakeLockEnabled;
+            if (wakeLockEnabled) await requestWakeLock();
+            else await releaseWakeLock();
+            updateWakeLockButton();
+        }
+        async function requestWakeLock() {
+            if (!wakeLockEnabled || document.visibilityState !== 'visible' || !('wakeLock' in navigator)) return;
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                wakeLock.addEventListener('release', () => { wakeLock = null; updateWakeLockButton(); });
+            } catch (e) {
+                wakeLockEnabled = false;
+                console.warn('画面点灯維持を開始できませんでした:', e);
+            }
+            updateWakeLockButton();
+        }
+        async function releaseWakeLock() {
+            if (wakeLock) { try { await wakeLock.release(); } catch (e) {} wakeLock = null; }
+        }
+        function updateWakeLockButton() {
+            const btn = document.getElementById('btn-wake-lock');
+            if (!btn) return;
+            btn.textContent = `画面を点灯したままにする：${wakeLockEnabled && wakeLock ? 'ON' : 'OFF'}`;
+            btn.className = `px-3 py-2 rounded-xl border ${wakeLockEnabled && wakeLock ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-slate-700 hover:bg-slate-600 border-slate-600 text-slate-200'}`;
+        }
+        function setupMediaSession() {
+            if (!('mediaSession' in navigator)) return;
+            try { navigator.mediaSession.metadata = new MediaMetadata({ title: '音声暗記プレイヤー', artist: '音声暗記', album: 'テキスト読み上げ' }); } catch (e) {}
+            const actions = {
+                play: () => { if (!state.isPlaying) togglePlayPause(); },
+                pause: () => { if (state.isPlaying) togglePlayPause(); },
+                nexttrack: () => nextSentence(),
+                previoustrack: () => prevSentence()
+            };
+            for (const [action, handler] of Object.entries(actions)) {
+                try { navigator.mediaSession.setActionHandler(action, handler); } catch (e) {}
+            }
         }
         function onSpeedChange() {
             const val = parseFloat(document.getElementById('slider-speed').value);
             state.playbackSpeed = val;
+            savePlaybackState();
             document.getElementById('val-speed').innerText = `${val.toFixed(1)}x`;
             if (state.audioElement) {
                 state.audioElement.playbackRate = val;
@@ -403,13 +498,45 @@
         function onDelayChange() {
             const val = parseFloat(document.getElementById('slider-delay').value);
             state.sentenceDelaySec = val;
+            savePlaybackState();
             document.getElementById('val-delay').innerText = `${val.toFixed(1)}秒`;
         }
         // Initialize on page load
         window.addEventListener('load', () => {
             initNativeVoices();
-            loadPreset(0);
+            const params = new URLSearchParams(window.location.search);
+            const shared = [params.get('title'), params.get('text'), params.get('url')].filter(Boolean).join('\n');
+            if (shared) {
+                document.getElementById('input-text').value = shared;
+                updateEditorStats();
+                showTab('editor');
+                history.replaceState({}, '', window.location.pathname);
+            } else {
+                restorePlaybackState();
+                if (!document.getElementById('input-text').value) loadPreset(0);
+            }
+            setupMediaSession();
+            updateWakeLockButton();
         });
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                savePlaybackState();
+                interruptedWhileHidden = state.isPlaying;
+                return;
+            }
+            if (wakeLockEnabled) requestWakeLock();
+            // Browsers may suspend Web Speech in the background; do not silently skip a sentence.
+            if (interruptedWhileHidden && state.isPlaying && synth && !synth.speaking && !state.timeoutId) {
+                state.isPlaying = false;
+                state.playToken++;
+                savePlaybackState();
+                updatePlayerUI();
+                document.getElementById('player-status-badge').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span> 中断の可能性あり（再生ボタンで続きから再開）';
+            }
+            interruptedWhileHidden = false;
+        });
+        window.addEventListener('pagehide', savePlaybackState);
+        window.addEventListener('pageshow', () => { if (wakeLockEnabled) requestWakeLock(); });
     </script>
 
     <!-- PWA Service Worker 登録スクリプト -->
