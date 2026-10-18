@@ -1,5 +1,14 @@
-const CACHE_NAME = 'audio-memorization-pwa-v2';
-const APP_SHELL = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png', '/favicon.png'];
+const CACHE_NAME = 'audio-memorization-pwa-v3';
+const BASE_URL = new URL('./', self.location.href);
+const APP_SHELL = [
+  './',
+  './index.html',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './favicon.png'
+].map(path => new URL(path, BASE_URL).href);
+const INDEX_URL = new URL('./index.html', BASE_URL).href;
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -23,7 +32,8 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
   event.respondWith(
     fetch(event.request).catch(() =>
-      caches.match(event.request).then(response => response || caches.match('/index.html'))
+      caches.match(event.request).then(response => response ||
+        (event.request.mode === 'navigate' ? caches.match(INDEX_URL) : undefined))
     )
   );
 });

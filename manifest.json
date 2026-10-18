@@ -1,23 +1,23 @@
 {
-  "id": "/",
+  "id": "./",
   "name": "隙間時間テキスト読み上げ・音声暗記プレイヤー",
   "short_name": "音声暗記",
   "description": "テキストを音声で読み上げ、隙間時間に暗記をサポートするプレイヤー",
   "lang": "ja",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "./icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
