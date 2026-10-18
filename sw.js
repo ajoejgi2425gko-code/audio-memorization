@@ -1,4 +1,4 @@
-const CACHE_NAME = 'audio-memorization-pwa-v6';
+const CACHE_NAME = 'audio-memorization-pwa-v7';
 const SHARE_CACHE = 'audio-memorization-share-v1';
 const SHARE_DATA_URL = new URL('./__shared_data__', self.location.href).href;
 const BASE_URL = new URL('./', self.location.href);
@@ -47,6 +47,18 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
+
+  // The share payload is stored in Cache Storage by the POST handler.
+  // Serve it from that cache directly; a normal network fetch would return
+  // GitHub Pages' 404 page and prevent the app from reading the saved payload.
+  if (url.href === SHARE_DATA_URL) {
+    event.respondWith((async () => {
+      const cache = await caches.open(SHARE_CACHE);
+      return (await cache.match(SHARE_DATA_URL)) || new Response('', { status: 404 });
+    })());
+    return;
+  }
+
   event.respondWith(
     fetch(event.request).catch(() =>
       caches.match(event.request).then(response => response ||
