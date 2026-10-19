@@ -1,4 +1,4 @@
-const CACHE_NAME = 'audio-memorization-pwa-v7';
+const CACHE_NAME = 'audio-memorization-pwa-v7-identity-fix';
 const SHARE_CACHE = 'audio-memorization-share-v1';
 const SHARE_DATA_URL = new URL('./__shared_data__', self.location.href).href;
 const BASE_URL = new URL('./', self.location.href);
